@@ -366,36 +366,36 @@ struct LoggedInView: View {
             }
         }
         ToolbarItem(placement: .navigation) {
-            contextMenu
+            contextToolbarActions
         }
     }
 
-    // MARK: - Context Menu
+    // MARK: - Context Actions
 
     @ViewBuilder
-    private var contextMenu: some View {
+    private var contextToolbarActions: some View {
         switch selectedNavigationItem {
         case .albums:
             if let albumId = selectedAlbumId, let album = store.albums[albumId] {
-                albumContextMenu(album: album)
+                albumToolbarActions(album: album)
             }
         case .artists:
             if let artistId = selectedArtistId, let artist = store.artists[artistId] {
-                artistContextMenu(artist: artist)
+                artistToolbarActions(artist: artist)
             }
         case .playlists:
             if let playlistId = selectedPlaylistId, let playlist = store.playlists[playlistId] {
-                playlistContextMenu(playlist: playlist)
+                playlistToolbarActions(playlist: playlist)
             }
         default:
             EmptyView()
         }
     }
 
-    private func albumContextMenu(album: Album) -> some View {
+    private func albumToolbarActions(album: Album) -> some View {
         let isInLibrary = store.userAlbumIds.contains(album.id)
 
-        return Menu {
+        return HStack(spacing: 8) {
             Button {
                 Task {
                     let token = await session.validAccessToken()
@@ -404,19 +404,10 @@ struct LoggedInView: View {
             } label: {
                 Label("track.menu.play_next", systemImage: "text.line.first.and.arrowtriangle.forward")
             }
+            .labelStyle(.iconOnly)
+            .help("track.menu.play_next")
 
-            Divider()
-
-            Button {
-                if let externalUrl = album.externalUrl {
-                    let pasteboard = NSPasteboard.general
-                    pasteboard.clearContents()
-                    pasteboard.setString(externalUrl, forType: .string)
-                }
-            } label: {
-                Label("action.share", systemImage: "square.and.arrow.up")
-            }
-            .disabled(album.externalUrl == nil)
+            shareToolbarButton(externalUrl: album.externalUrl)
 
             if let artistId = album.artistId {
                 Button {
@@ -424,9 +415,9 @@ struct LoggedInView: View {
                 } label: {
                     Label("track.menu.go_to_artist", systemImage: "person")
                 }
+                .labelStyle(.iconOnly)
+                .help("track.menu.go_to_artist")
             }
-
-            Divider()
 
             if isInLibrary {
                 Button(role: .destructive) {
@@ -434,6 +425,8 @@ struct LoggedInView: View {
                 } label: {
                     Label("album.menu.remove_from_library", systemImage: "minus.circle")
                 }
+                .labelStyle(.iconOnly)
+                .help("album.menu.remove_from_library")
             } else {
                 Button {
                     Task {
@@ -443,29 +436,17 @@ struct LoggedInView: View {
                 } label: {
                     Label("album.menu.add_to_library", systemImage: "plus.circle")
                 }
+                .labelStyle(.iconOnly)
+                .help("album.menu.add_to_library")
             }
-        } label: {
-            Image(systemName: "ellipsis")
         }
-        .menuIndicator(.hidden)
     }
 
-    private func artistContextMenu(artist: Artist) -> some View {
+    private func artistToolbarActions(artist: Artist) -> some View {
         let isFollowing = store.userArtistIds.contains(artist.id)
 
-        return Menu {
-            Button {
-                if let externalUrl = artist.externalUrl {
-                    let pasteboard = NSPasteboard.general
-                    pasteboard.clearContents()
-                    pasteboard.setString(externalUrl, forType: .string)
-                }
-            } label: {
-                Label("action.share", systemImage: "square.and.arrow.up")
-            }
-            .disabled(artist.externalUrl == nil)
-
-            Divider()
+        return HStack(spacing: 8) {
+            shareToolbarButton(externalUrl: artist.externalUrl)
 
             if isFollowing {
                 Button(role: .destructive) {
@@ -473,6 +454,8 @@ struct LoggedInView: View {
                 } label: {
                     Label("artist.menu.unfollow", systemImage: "person.badge.minus")
                 }
+                .labelStyle(.iconOnly)
+                .help("artist.menu.unfollow")
             } else {
                 Button {
                     Task {
@@ -482,18 +465,17 @@ struct LoggedInView: View {
                 } label: {
                     Label("artist.menu.follow", systemImage: "person.badge.plus")
                 }
+                .labelStyle(.iconOnly)
+                .help("artist.menu.follow")
             }
-        } label: {
-            Image(systemName: "ellipsis")
         }
-        .menuIndicator(.hidden)
     }
 
-    private func playlistContextMenu(playlist: Playlist) -> some View {
+    private func playlistToolbarActions(playlist: Playlist) -> some View {
         let isOwner = playlist.ownerId == store.userId
         let isInLibrary = store.userPlaylistIds.contains(playlist.id)
 
-        return Menu {
+        return HStack(spacing: 8) {
             Button {
                 Task {
                     let token = await session.validAccessToken()
@@ -502,45 +484,36 @@ struct LoggedInView: View {
             } label: {
                 Label("track.menu.play_next", systemImage: "text.line.first.and.arrowtriangle.forward")
             }
+            .labelStyle(.iconOnly)
+            .help("track.menu.play_next")
 
-            Divider()
-
-            Button {
-                if let externalUrl = playlist.externalUrl {
-                    let pasteboard = NSPasteboard.general
-                    pasteboard.clearContents()
-                    pasteboard.setString(externalUrl, forType: .string)
-                }
-            } label: {
-                Label("action.share", systemImage: "square.and.arrow.up")
-            }
-            .disabled(playlist.externalUrl == nil)
+            shareToolbarButton(externalUrl: playlist.externalUrl)
 
             if isOwner {
-                Divider()
-
                 Button {
                     NotificationCenter.default.post(name: .showPlaylistEditDetails, object: playlist.id)
                 } label: {
                     Label("playlist.menu.edit_details", systemImage: "pencil")
                 }
-
-                Divider()
+                .labelStyle(.iconOnly)
+                .help("playlist.menu.edit_details")
 
                 Button(role: .destructive) {
                     NotificationCenter.default.post(name: .showPlaylistDeleteConfirmation, object: playlist.id)
                 } label: {
                     Label("playlist.menu.delete", systemImage: "trash")
                 }
+                .labelStyle(.iconOnly)
+                .help("playlist.menu.delete")
             } else {
-                Divider()
-
                 if isInLibrary {
                     Button(role: .destructive) {
                         NotificationCenter.default.post(name: .showPlaylistUnfollowConfirmation, object: playlist.id)
                     } label: {
                         Label("playlist.menu.unfollow", systemImage: "minus.circle")
                     }
+                    .labelStyle(.iconOnly)
+                    .help("playlist.menu.unfollow")
                 } else {
                     Button {
                         Task {
@@ -550,12 +523,26 @@ struct LoggedInView: View {
                     } label: {
                         Label("playlist.menu.follow", systemImage: "plus.circle")
                     }
+                    .labelStyle(.iconOnly)
+                    .help("playlist.menu.follow")
                 }
             }
-        } label: {
-            Image(systemName: "ellipsis")
         }
-        .menuIndicator(.hidden)
+    }
+
+    private func shareToolbarButton(externalUrl: String?) -> some View {
+        Button {
+            if let externalUrl {
+                let pasteboard = NSPasteboard.general
+                pasteboard.clearContents()
+                pasteboard.setString(externalUrl, forType: .string)
+            }
+        } label: {
+            Label("action.share", systemImage: "square.and.arrow.up")
+        }
+        .labelStyle(.iconOnly)
+        .help("action.share")
+        .disabled(externalUrl == nil)
     }
 
     private func performSearch() {
