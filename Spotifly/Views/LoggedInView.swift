@@ -314,21 +314,27 @@ struct LoggedInView: View {
                 } content: {
                     contentView()
                         .navigationSplitViewColumnWidth(min: 300, ideal: 450, max: 600)
+                        .toolbar { contentColumnToolbar }
                 } detail: {
                     detailView()
+                        .toolbar { detailColumnToolbar }
+                        .searchable(text: $searchText, isPresented: $searchFieldFocused)
+                        .onSubmit(of: .search) { performSearch() }
+                        .onChange(of: searchText) { _, newValue in handleSearchTextChange(newValue) }
                 }
             } else {
                 NavigationSplitView(columnVisibility: $columnVisibility) {
                     sidebarView()
                 } detail: {
                     contentView()
+                        .toolbar { contentColumnToolbar }
+                        .searchable(text: $searchText, isPresented: $searchFieldFocused)
+                        .onSubmit(of: .search) { performSearch() }
+                        .onChange(of: searchText) { _, newValue in handleSearchTextChange(newValue) }
                 }
             }
         }
         .navigationSplitViewStyle(.automatic)
-        .searchable(text: $searchText, isPresented: $searchFieldFocused)
-        .onSubmit(of: .search) { performSearch() }
-        .onChange(of: searchText) { _, newValue in handleSearchTextChange(newValue) }
         .onChange(of: store.activeDeviceId) { _, newId in
             if newId == nil || newId == store.ownDeviceId {
                 playbackViewModel.becameLocalActiveDevice()
@@ -340,11 +346,10 @@ struct LoggedInView: View {
             guard let newPercent, store.activeDeviceId != store.ownDeviceId else { return }
             playbackViewModel.remoteDeviceVolumeUpdated(newPercent)
         }
-        .toolbar { refreshToolbarItem }
     }
 
     @ToolbarContentBuilder
-    private var refreshToolbarItem: some ToolbarContent {
+    private var contentColumnToolbar: some ToolbarContent {
         ToolbarItem(placement: .navigation) {
             if canRefreshCurrentSection {
                 Button {
@@ -365,7 +370,11 @@ struct LoggedInView: View {
                 .help("queue.scroll_to_current")
             }
         }
-        ToolbarItem(placement: .navigation) {
+    }
+
+    @ToolbarContentBuilder
+    private var detailColumnToolbar: some ToolbarContent {
+        ToolbarItem(placement: .automatic) {
             contextToolbarActions
         }
     }
