@@ -91,7 +91,7 @@ final class PlaylistService {
 
     /// Fetch playlist details and tracks
     func fetchPlaylistDetails(playlistId: String, accessToken: String) async throws -> Playlist {
-        // Fetch details and tracks in parallel
+        // Fetch details and tracks in parallel; fall back to spclient if Web API 403s
         async let detailsTask = SpotifyAPI.fetchPlaylistDetails(
             accessToken: accessToken,
             playlistId: playlistId,
@@ -101,7 +101,15 @@ final class PlaylistService {
             playlistId: playlistId,
         )
 
-        let (details, playlistTracks) = try await (detailsTask, tracksTask)
+        let details = try await detailsTask
+
+        let playlistTracks: [APITrack]
+        do {
+            playlistTracks = try await tracksTask
+        } catch SpotifyAPIError.forbidden {
+            debugLog("PlaylistService", "Web API 403 on tracks for \(playlistId), falling back to spclient")
+            playlistTracks = try await SpotifyAPI.fetchPlaylistTracksSpclient(playlistId: playlistId)
+        }
 
         // Convert tracks to unified entities and store them
         let tracks = playlistTracks.map { Track(from: $0) }

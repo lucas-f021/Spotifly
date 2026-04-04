@@ -1,6 +1,7 @@
 mod proxy_sink;
 
-use futures_util::StreamExt;
+use futures_util::{future::join_all, StreamExt};
+use librespot_metadata::{Metadata, Playlist as SpPlaylist, Track as SpTrack};
 use librespot_connect::{ConnectConfig, LoadRequest, LoadRequestOptions, PlayingTrack, Spirc};
 use librespot_core::cache::Cache;
 use librespot_core::config::DeviceType;
@@ -2974,4 +2975,146 @@ pub extern "C" fn spotifly_add_to_queue(uri: *const c_char) -> i32 {
             -1
         }
     }
+}
+
+// ============================================================================
+// spclient playlist tracks fallback
+// ============================================================================
+
+/// Fetches playlist tracks via librespot's internal spclient protocol.
+/// Bypasses the Web API /playlists/{id}/tracks endpoint which 403s for dev-mode apps.
+///
+/// Returns a newly allocated JSON C string on success (caller must free via spotifly_free_string),
+/// or null on error. The JSON is formatted to match the Spotify Web API PlaylistItemsCodable:
+/// {"items": [{"added_at": null, "track": {...}}, ...]}
+#[no_mangle]
+pub extern "C" fn spotifly_get_playlist_tracks_spclient(
+    playlist_id: *const c_char,
+) -> *mut c_char {
+    if playlist_id.is_null() {
+        debug!("[spclient] playlist_id is null");
+        return std::ptr::null_mut();
+    }
+
+    let id_str = unsafe {
+        match CStr::from_ptr(playlist_id).to_str() {
+            Ok(s) => s.to_string(),
+            Err(_) => {
+                debug!("[spclient] invalid playlist_id string");
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let session = {
+        let guard = SESSION.lock().unwrap();
+        match guard.as_ref() {
+            Some(s) => s.clone(),
+            None => {
+                debug!("[spclient] no active session");
+                return std::ptr::null_mut();
+            }
+        }
+    };
+
+    let result = RUNTIME.block_on(async move {
+        fetch_playlist_tracks_via_spclient(&session, &id_str).await
+    });
+
+    match result {
+        Ok(json) => match CString::new(json) {
+            Ok(c) => c.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
+        Err(e) => {
+            debug!("[spclient] fetch_playlist_tracks_via_spclient failed: {}", e);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+async fn fetch_playlist_tracks_via_spclient(
+    session: &Session,
+    playlist_id: &str,
+) -> Result<String, String> {
+    let playlist_uri = SpotifyUri::from_uri(&format!("spotify:playlist:{playlist_id}"))
+        .map_err(|e| format!("invalid playlist URI: {e}"))?;
+
+    let playlist = SpPlaylist::get(session, &playlist_uri)
+        .await
+        .map_err(|e| format!("SpPlaylist::get failed: {e}"))?;
+
+    let track_uris: Vec<SpotifyUri> = playlist.tracks().cloned().collect();
+    debug!("[spclient] playlist {} has {} tracks", playlist_id, track_uris.len());
+
+    let futures: Vec<_> = track_uris.iter()
+        .map(|uri| SpTrack::get(session, uri))
+        .collect();
+    let results = join_all(futures).await;
+
+    let mut items: Vec<serde_json::Value> = Vec::new();
+    for r in results {
+        match r {
+            Ok(sp_track) => {
+                let track_id = sp_track.id.to_id();
+                let track_uri = sp_track.id.to_uri();
+
+                let cover_url = sp_track.album.covers.first()
+                    .map(|img| format!("https://i.scdn.co/image/{}", img.id.to_base16()))
+                    .unwrap_or_default();
+
+                let album_id = sp_track.album.id.to_id();
+                let album_uri = sp_track.album.id.to_uri();
+
+                let artists: Vec<serde_json::Value> = sp_track.artists.iter().map(|a| {
+                    serde_json::json!({
+                        "id": a.id.to_id(),
+                        "name": a.name,
+                        "uri": a.id.to_uri()
+                    })
+                }).collect();
+
+                let album_artists: Vec<serde_json::Value> = sp_track.album.artists.iter().map(|a| {
+                    serde_json::json!({
+                        "id": a.id.to_id(),
+                        "name": a.name,
+                        "uri": a.id.to_uri()
+                    })
+                }).collect();
+
+                let track = serde_json::json!({
+                    "id": track_id,
+                    "name": sp_track.name,
+                    "uri": track_uri,
+                    "duration_ms": sp_track.duration,
+                    "track_number": sp_track.number,
+                    "disc_number": sp_track.disc_number,
+                    "artists": artists,
+                    "album": {
+                        "id": album_id,
+                        "name": sp_track.album.name,
+                        "uri": album_uri,
+                        "images": if cover_url.is_empty() {
+                            serde_json::json!([])
+                        } else {
+                            serde_json::json!([{"url": cover_url}])
+                        },
+                        "artists": album_artists
+                    },
+                    "external_urls": { "spotify": format!("https://open.spotify.com/track/{track_id}") }
+                });
+
+                items.push(serde_json::json!({
+                    "added_at": null,
+                    "track": track
+                }));
+            }
+            Err(e) => {
+                debug!("[spclient] SpTrack::get failed: {}", e);
+            }
+        }
+    }
+
+    let json = serde_json::json!({ "items": items });
+    serde_json::to_string(&json).map_err(|e| e.to_string())
 }

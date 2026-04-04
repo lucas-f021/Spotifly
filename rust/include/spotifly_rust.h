@@ -346,6 +346,22 @@ bool spotifly_get_gapless(void);
 /// @param volume Initial volume level (0 = muted, 65535 = max)
 void spotifly_set_initial_volume(uint16_t volume);
 
+// ============================================================================
+// spclient playlist tracks fallback
+// ============================================================================
+
+/// Fetches playlist tracks via librespot's internal spclient protocol.
+/// Use as fallback when the Web API /playlists/{id}/tracks returns 403.
+///
+/// Returns a JSON C string matching the Spotify Web API playlist items format:
+///   {"items": [{"added_at": null, "track": {...}}, ...]}
+/// Returns NULL on error (no session, bad ID, spclient failure).
+///
+/// IMPORTANT: The caller must free the returned string with spotifly_free_string().
+///
+/// @param playlist_id Spotify playlist ID (22-character base62 string, NOT a full URI)
+char* spotifly_get_playlist_tracks_spclient(const char* playlist_id);
+
 #ifdef __cplusplus
 }
 #endif

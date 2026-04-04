@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SpotiflyRust
 
 extension SpotifyAPI {
     // MARK: - Single Track
@@ -311,10 +312,46 @@ extension SpotifyAPI {
             }
         case 401:
             throw SpotifyAPIError.unauthorized
+        case 403:
+            throw SpotifyAPIError.forbidden
         case 404:
             throw SpotifyAPIError.notFound
         default:
             try throwAPIError(data: data, statusCode: httpResponse.statusCode)
+        }
+    }
+
+    /// Fetches playlist tracks via librespot's internal spclient protocol.
+    /// Used as fallback when the Web API returns 403 (dev-mode app restriction).
+    static func fetchPlaylistTracksSpclient(playlistId: String) async throws -> [APITrack] {
+        debugLog("SpotifyAPI", "[spclient] fetching tracks for playlist \(playlistId)")
+
+        // Call the blocking Rust FFI on a background thread to avoid holding the cooperative thread pool
+        let json: String = try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                guard let rawPtr = spotifly_get_playlist_tracks_spclient(playlistId) else {
+                    continuation.resume(throwing: SpotifyAPIError.apiError("spclient returned no data"))
+                    return
+                }
+                let result = String(cString: rawPtr)
+                spotifly_free_string(rawPtr)
+                continuation.resume(returning: result)
+            }
+        }
+
+        guard let data = json.data(using: .utf8) else {
+            throw SpotifyAPIError.invalidResponse
+        }
+
+        do {
+            let decoded = try JSONDecoder().decode(PlaylistItemsCodable.self, from: data)
+            let tracks = decoded.items.compactMap { item in
+                item.track?.toAPITrack(addedAt: item.addedAt)
+            }
+            debugLog("SpotifyAPI", "[spclient] got \(tracks.count) tracks for playlist \(playlistId)")
+            return tracks
+        } catch {
+            throw SpotifyAPIError.invalidResponse
         }
     }
 }
