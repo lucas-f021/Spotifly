@@ -977,11 +977,7 @@ final class PlaybackViewModel {
         volumeDebounceSubscription = volumeSubject
             .throttle(for: .milliseconds(50), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] newVolume in
-                guard let self, isInitialized else {
-                    debugLog("PlaybackViewModel", "[Volume] throttle fired but isInitialized=\(self?.isInitialized ?? false), skipping")
-                    return
-                }
-                debugLog("PlaybackViewModel", "[Volume] throttle fired: \(Int(newVolume * 100))% isActiveDevice=\(SpotifyPlayer.isActiveDevice)")
+                guard let self, isInitialized else { return }
                 if SpotifyPlayer.isActiveDevice {
                     SpotifyPlayer.setVolume(newVolume)
                 } else {
