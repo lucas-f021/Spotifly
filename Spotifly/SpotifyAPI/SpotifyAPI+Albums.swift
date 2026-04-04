@@ -99,7 +99,7 @@ extension SpotifyAPI {
         artistId: String,
         limit: Int = 50,
     ) async throws -> [APIAlbum] {
-        let urlString = "\(baseURL)/artists/\(artistId)/albums?include_groups=album,single&market=from_token&limit=\(limit)"
+        let urlString = "\(baseURL)/artists/\(artistId)/albums?include_groups=album,single&limit=\(limit)"
 
         debugLog("SpotifyAPI", "[GET] \(urlString)")
 

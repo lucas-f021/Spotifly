@@ -27,6 +27,7 @@ enum SpotifyAPI {
 
     /// Helper to throw appropriate error from API error response data
     static func throwAPIError(data: Data, statusCode: Int) throws -> Never {
+        debugLog("SpotifyAPI", "[HTTP \(statusCode)] \(String(data: data, encoding: .utf8) ?? "<non-utf8 body>")")
         if let errorResponse = try? JSONDecoder().decode(SpotifyErrorResponse.self, from: data) {
             throw SpotifyAPIError.apiError(errorResponse.error.message)
         }

@@ -19,7 +19,7 @@ extension SpotifyAPI {
     ) async throws -> SearchResults {
         let typesString = types.map(\.rawValue).joined(separator: ",")
         let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-        let urlString = "\(baseURL)/search?q=\(encodedQuery)&type=\(typesString)&limit=\(limit)&market=from_token"
+        let urlString = "\(baseURL)/search?q=\(encodedQuery)&type=\(typesString)&limit=\(limit)"
         debugLog("SpotifyAPI", "[GET] \(urlString)")
 
         guard let url = URL(string: urlString) else {

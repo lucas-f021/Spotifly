@@ -280,7 +280,7 @@ extension SpotifyAPI {
 
     /// Fetches tracks for a specific playlist
     static func fetchPlaylistTracks(accessToken: String, playlistId: String) async throws -> [APITrack] {
-        let urlString = "\(baseURL)/playlists/\(playlistId)/tracks?limit=100&fields=items(added_at,track(id,name,uri,duration_ms,artists(id,name),album(id,name,images),external_urls(spotify)))&market=from_token"
+        let urlString = "\(baseURL)/playlists/\(playlistId)/tracks?limit=100"
 
         debugLog("SpotifyAPI", "[GET] \(urlString)")
 
@@ -296,6 +296,8 @@ extension SpotifyAPI {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw SpotifyAPIError.invalidResponse
         }
+
+        debugLog("SpotifyAPI", "[fetchPlaylistTracks] status=\(httpResponse.statusCode) playlistId=\(playlistId)")
 
         switch httpResponse.statusCode {
         case 200:
