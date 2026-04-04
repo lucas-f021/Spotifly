@@ -1010,9 +1010,14 @@ enum SpotifyPlayer {
     }
 
     /// Sets the playback volume (0.0 - 1.0).
-    /// Dispatched to background thread to avoid blocking the main thread on Spirc mutex.
+    /// Rescales the ring buffer immediately for zero-latency audio response,
+    /// then syncs volume to Spirc/Connect in the background.
     static func setVolume(_ volume: Double) {
-        let volumeU16 = UInt16(max(0, min(1, volume)) * 65535.0)
+        let clamped = max(0, min(1, volume))
+        // Rescale ring buffer immediately — audible on next hardware callback
+        audioRenderer.setVolume(Float(clamped))
+        // Sync to Spirc/Connect on background thread (Rust mixer + Connect broadcast)
+        let volumeU16 = UInt16(clamped * 65535.0)
         Task.detached(priority: .userInitiated) {
             spotifly_set_volume(volumeU16)
         }

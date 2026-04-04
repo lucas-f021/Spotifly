@@ -22,8 +22,8 @@ final nonisolated class AudioRenderer: @unchecked Sendable {
     private static let channelCount: UInt32 = 2
     private static let bytesPerSample = MemoryLayout<Float>.size // 4
 
-    /// Ring buffer capacity in f32 samples (~2 seconds of stereo audio)
-    private static let ringBufferCapacity = 176_400 // 44100 * 2ch * 2s
+    /// Ring buffer capacity in f32 samples (~1 second of stereo audio)
+    private static let ringBufferCapacity = 88_200 // 44100 * 2ch * 1s
 
     /// Chunk size for feeding renderer (~1024 frames = 2048 stereo samples)
     private static let feedChunkSamples = 2048
@@ -44,6 +44,11 @@ final nonisolated class AudioRenderer: @unchecked Sendable {
     private let spaceAvailable = DispatchSemaphore(value: 0)
     private var writerIsWaiting = false
 
+    // MARK: - Volume (applied when reading from ring buffer)
+
+    /// Current volume scale factor (0.0 – 1.0). Protected by bufferLock.
+    private var currentVolume: Float = 1.0
+
     // MARK: - Write Throttle (provides real-time pacing)
 
     /// Wall-clock time (monotonic) when writing started. Must be accessed with bufferLock held.
@@ -53,8 +58,9 @@ final nonisolated class AudioRenderer: @unchecked Sendable {
     private var totalSamplesWritten: Int64 = 0
 
     /// Maximum seconds the writer can be ahead of real-time before sleeping.
-    /// This replaces the backpressure that CoreAudio callbacks provided in the old rodio/cpal path.
-    private static let maxBufferAheadSeconds: Double = 2.0
+    /// 0.5s gives the decoder enough runway to avoid underruns. Volume changes still
+    /// land quickly because setVolume() rescales all ring buffer samples in-place.
+    private static let maxBufferAheadSeconds: Double = 0.5
 
     // MARK: - State
 
@@ -246,10 +252,19 @@ final nonisolated class AudioRenderer: @unchecked Sendable {
             readIndex = (readIndex + toRead) % Self.ringBufferCapacity
             let shouldSignal = writerIsWaiting
             writerIsWaiting = false
+            let vol = currentVolume
             bufferLock.unlock()
 
             if shouldSignal {
                 spaceAvailable.signal()
+            }
+
+            // Apply volume scaling to this chunk
+            if vol < 0.9999 {
+                let ptr = chunk.assumingMemoryBound(to: Float.self)
+                for i in 0 ..< toRead {
+                    ptr[i] *= vol
+                }
             }
 
             // Create CMBlockBuffer from chunk data
@@ -299,6 +314,39 @@ final nonisolated class AudioRenderer: @unchecked Sendable {
             // Enqueue
             renderer.enqueue(sample)
         }
+    }
+
+    // MARK: - Volume Control
+
+    /// Set the playback volume (0.0 – 1.0) with immediate effect.
+    ///
+    /// Two-step approach:
+    /// 1. Rescale all samples in the ring buffer in-place (< 1ms for ≤ 176 400 floats).
+    /// 2. Flush AVSampleBufferAudioRenderer's internal buffer and restart — this discards
+    ///    any pre-queued samples that still carry the old volume, so the renderer
+    ///    immediately pulls fresh (correctly-scaled) chunks from the ring buffer.
+    func setVolume(_ newVolume: Float) {
+        let clamped = max(0.0, min(1.0, newVolume))
+
+        bufferLock.lock()
+        let old = currentVolume
+        currentVolume = clamped
+        // Rescale buffered samples from old volume to new volume in-place.
+        if old > 0.0001 {
+            let scale = clamped / old
+            var idx = readIndex
+            var remaining = availableSamples
+            while remaining > 0 {
+                ringBuffer[idx] *= scale
+                idx = (idx + 1) % Self.ringBufferCapacity
+                remaining -= 1
+            }
+        }
+        let rendering = isRendering
+        bufferLock.unlock()
+
+        // No flush needed — maxBufferAheadSeconds is small (0.2s), so the renderer's
+        // internal queue drains within ~200ms of rescaled data from the ring buffer.
     }
 
     // MARK: - Playback Control

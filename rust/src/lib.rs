@@ -2705,7 +2705,7 @@ pub extern "C" fn spotifly_play_radio(track_uri: *const c_char) -> i32 {
 /// Returns 0 on success, -1 on error, -2 if channel closed (needs reinit).
 #[no_mangle]
 pub extern "C" fn spotifly_set_volume(volume: u16) -> i32 {
-    debug!("spotifly_set_volume called: {}", volume);
+    debug!("[Volume] spotifly_set_volume called: {}", volume);
 
     // Apply to the mixer immediately — this is a direct atomic write with zero latency,
     // so the audio output level changes instantly without waiting for Spirc roundtrip.
@@ -2713,6 +2713,9 @@ pub extern "C" fn spotifly_set_volume(volume: u16) -> i32 {
         let mixer_guard = MIXER.lock().unwrap();
         if let Some(mixer) = mixer_guard.as_ref() {
             mixer.set_volume(volume);
+            debug!("[Volume] mixer.set_volume({}) applied, readback={}", volume, mixer.volume());
+        } else {
+            debug!("[Volume] mixer is None — cannot apply volume immediately");
         }
     }
 
