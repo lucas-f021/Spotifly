@@ -970,11 +970,12 @@ final class PlaybackViewModel {
         remoteVolume = Double(volumePercent) / 100.0
     }
 
-    /// Subscribe to debounced volume changes
-    /// Debounces rapid volume changes (e.g., slider dragging) to avoid flooding Spirc with requests
+    /// Subscribe to throttled volume changes
+    /// Throttles rapid volume changes (e.g., slider dragging) to fire immediately on first move
+    /// and at most once per 50ms while dragging, so audio updates in real time.
     private func setupVolumeDebounceSubscription() {
         volumeDebounceSubscription = volumeSubject
-            .debounce(for: .milliseconds(50), scheduler: DispatchQueue.main)
+            .throttle(for: .milliseconds(50), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] newVolume in
                 guard let self, isInitialized else { return }
                 if SpotifyPlayer.isActiveDevice {
