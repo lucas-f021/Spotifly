@@ -70,6 +70,9 @@ struct ArtistDetailView: View {
         }
         .navigationTitle(artist?.name ?? "")
         .task(id: artistId) {
+            // Debounce: if user clicks through artists quickly, cancel before firing requests
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
             // Use initial artist if provided, otherwise fetch
             if let initialArtist {
                 artist = initialArtist

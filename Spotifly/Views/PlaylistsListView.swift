@@ -119,6 +119,7 @@ struct PlaylistsListView: View {
                 accessToken: token,
                 forceRefresh: forceRefresh,
             )
+            StoreCache.save(from: store)
         } catch {
             errorMessage = error.localizedDescription
         }

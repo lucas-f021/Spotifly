@@ -33,6 +33,11 @@ struct Queue {
     var errorMessage: String?
 }
 
+// MARK: - Cache TTLs (shared with StoreCache)
+
+let libraryTTL: TimeInterval = 24 * 60 * 60
+let favoritesTTL: TimeInterval = 60 * 60
+
 // MARK: - App Store
 
 @MainActor
@@ -568,6 +573,64 @@ final class AppStore {
     /// Update connection state
     func setConnection(_ connection: SpotifyConnection?) {
         self.connection = connection
+    }
+
+    // MARK: - Cache Accessors (read-only snapshots for StoreCache)
+
+    var cachedTracks: [String: Track] { tracks }
+    var cachedAlbums: [String: Album] { albums }
+    var cachedArtists: [String: Artist] { artists }
+    var cachedPlaylists: [String: Playlist] { playlists }
+    var cachedUserAlbumIds: [String] { userAlbumIds }
+    var cachedUserArtistIds: [String] { userArtistIds }
+    var cachedUserPlaylistIds: [String] { userPlaylistIds }
+    var cachedSavedTrackIds: [String] { savedTrackIds }
+    var cachedFavoriteTrackIds: Set<String> { favoriteTrackIds }
+
+    // MARK: - Cache Apply
+
+    /// Applies a loaded cache snapshot to the store. Only applies sections that are not expired.
+    func applyCache(_ snapshot: CacheSnapshot) {
+        if let section = snapshot.tracks, !section.isExpired(ttl: libraryTTL) {
+            tracks.merge(section.data) { _, new in new }
+        }
+        if let section = snapshot.albums, !section.isExpired(ttl: libraryTTL) {
+            albums.merge(section.data) { _, new in new }
+        }
+        if let section = snapshot.artists, !section.isExpired(ttl: libraryTTL) {
+            artists.merge(section.data) { _, new in new }
+        }
+        if let section = snapshot.playlists, !section.isExpired(ttl: libraryTTL) {
+            playlists.merge(section.data) { _, new in new }
+        }
+        if let section = snapshot.userAlbumIds, !section.isExpired(ttl: libraryTTL), !section.data.isEmpty {
+            userAlbumIds = section.data
+        }
+        if let section = snapshot.userArtistIds, !section.isExpired(ttl: libraryTTL), !section.data.isEmpty {
+            userArtistIds = section.data
+        }
+        if let section = snapshot.userPlaylistIds, !section.isExpired(ttl: libraryTTL), !section.data.isEmpty {
+            userPlaylistIds = section.data
+        }
+        if let section = snapshot.savedTrackIds, !section.isExpired(ttl: favoritesTTL), !section.data.isEmpty {
+            savedTrackIds = section.data
+        }
+        if let section = snapshot.favoriteTrackIds, !section.isExpired(ttl: favoritesTTL) {
+            favoriteTrackIds = Set(section.data)
+        }
+        if let section = snapshot.albumsPagination, !section.isExpired(ttl: libraryTTL) {
+            albumsPagination = section.data
+        }
+        if let section = snapshot.artistsPagination, !section.isExpired(ttl: libraryTTL) {
+            artistsPagination = section.data
+        }
+        if let section = snapshot.playlistsPagination, !section.isExpired(ttl: libraryTTL) {
+            playlistsPagination = section.data
+        }
+        if let section = snapshot.favoritesPagination, !section.isExpired(ttl: favoritesTTL) {
+            favoritesPagination = section.data
+        }
+        debugLog("StoreCache", "Applied cache: \(albums.count) albums, \(artists.count) artists, \(playlists.count) playlists, \(tracks.count) tracks")
     }
 
     // MARK: - Debug

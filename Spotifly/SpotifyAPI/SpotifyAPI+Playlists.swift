@@ -23,11 +23,7 @@ extension SpotifyAPI {
         var request = URLRequest(url: url)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SpotifyAPIError.invalidResponse
-        }
+        let (data, httpResponse) = try await SpotifyAPI.data(for: request)
 
         switch httpResponse.statusCode {
         case 200:
@@ -68,11 +64,7 @@ extension SpotifyAPI {
         var request = URLRequest(url: url)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SpotifyAPIError.invalidResponse
-        }
+        let (data, httpResponse) = try await SpotifyAPI.data(for: request)
 
         debugLog("SpotifyAPI", "[fetchPlaylistDetails] status=\(httpResponse.statusCode) playlistId=\(playlistId)")
 
@@ -122,11 +114,7 @@ extension SpotifyAPI {
         ]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SpotifyAPIError.invalidResponse
-        }
+        let (data, httpResponse) = try await SpotifyAPI.data(for: request)
 
         switch httpResponse.statusCode {
         case 200, 201:
@@ -167,11 +155,7 @@ extension SpotifyAPI {
         let body: [String: Any] = ["uris": trackUris]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SpotifyAPIError.invalidResponse
-        }
+        let (data, httpResponse) = try await SpotifyAPI.data(for: request)
 
         switch httpResponse.statusCode {
         case 201:
@@ -212,11 +196,7 @@ extension SpotifyAPI {
         if let description { body["description"] = description }
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SpotifyAPIError.invalidResponse
-        }
+        let (data, httpResponse) = try await SpotifyAPI.data(for: request)
 
         switch httpResponse.statusCode {
         case 200:
@@ -246,11 +226,7 @@ extension SpotifyAPI {
         request.httpMethod = "DELETE"
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SpotifyAPIError.invalidResponse
-        }
+        let (data, httpResponse) = try await SpotifyAPI.data(for: request)
 
         switch httpResponse.statusCode {
         case 200:
@@ -284,11 +260,7 @@ extension SpotifyAPI {
         // Empty body required
         request.httpBody = "{}".data(using: .utf8)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SpotifyAPIError.invalidResponse
-        }
+        let (data, httpResponse) = try await SpotifyAPI.data(for: request)
 
         switch httpResponse.statusCode {
         case 200:
@@ -327,11 +299,7 @@ extension SpotifyAPI {
         let body: [String: Any] = ["tracks": tracks]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SpotifyAPIError.invalidResponse
-        }
+        let (data, httpResponse) = try await SpotifyAPI.data(for: request)
 
         switch httpResponse.statusCode {
         case 200:
@@ -375,11 +343,7 @@ extension SpotifyAPI {
         ]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SpotifyAPIError.invalidResponse
-        }
+        let (data, httpResponse) = try await SpotifyAPI.data(for: request)
 
         switch httpResponse.statusCode {
         case 200:
@@ -417,11 +381,7 @@ extension SpotifyAPI {
         let body: [String: Any] = ["uris": trackUris]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SpotifyAPIError.invalidResponse
-        }
+        let (data, httpResponse) = try await SpotifyAPI.data(for: request)
 
         switch httpResponse.statusCode {
         case 200, 201:

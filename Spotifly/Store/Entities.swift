@@ -11,7 +11,7 @@ import Foundation
 // MARK: - Image Types
 
 /// A single image variant with its URL and pixel dimensions.
-struct ImageVariant: Sendable, Hashable, Encodable {
+struct ImageVariant: Sendable, Hashable, Codable {
     let url: URL
     let size: Int // width in pixels (images are square)
 }
@@ -19,7 +19,7 @@ struct ImageVariant: Sendable, Hashable, Encodable {
 /// A collection of image variants at different resolutions.
 /// Stores all sizes returned by the Spotify API and provides
 /// resolution-aware selection based on display size and scale.
-struct ImageSet: Sendable, Hashable, Encodable {
+struct ImageSet: Sendable, Hashable, Codable {
     /// Sorted descending by size (largest first), matching Spotify's default order.
     let variants: [ImageVariant]
 
@@ -62,7 +62,7 @@ struct ImageSet: Sendable, Hashable, Encodable {
 
 /// Unified track entity - single source of truth for all track data.
 /// Constructed from APITrack via EntityConversions.
-struct Track: Identifiable, Sendable, Hashable, Encodable {
+struct Track: Identifiable, Sendable, Hashable, Codable {
     let id: String
     let name: String
     let uri: String
@@ -92,7 +92,12 @@ struct Track: Identifiable, Sendable, Hashable, Encodable {
 // MARK: - Album
 
 /// Unified album entity.
-struct Album: Identifiable, Sendable, Hashable, Encodable {
+struct Album: Identifiable, Sendable, Hashable, Codable {
+    enum CodingKeys: String, CodingKey {
+        case id, name, uri, images, releaseDate, albumType, externalUrl
+        case artistId, artistName, trackIds, totalDurationMs
+        case _knownTrackCount = "knownTrackCount"
+    }
     let id: String
     let name: String
     let uri: String
@@ -160,7 +165,7 @@ struct Album: Identifiable, Sendable, Hashable, Encodable {
 // MARK: - Artist
 
 /// Unified artist entity.
-struct Artist: Identifiable, Sendable, Hashable, Encodable {
+struct Artist: Identifiable, Sendable, Hashable, Codable {
     let id: String
     let name: String
     let uri: String
@@ -172,7 +177,12 @@ struct Artist: Identifiable, Sendable, Hashable, Encodable {
 // MARK: - Playlist
 
 /// Unified playlist entity.
-struct Playlist: Identifiable, Sendable, Hashable, Encodable {
+struct Playlist: Identifiable, Sendable, Hashable, Codable {
+    enum CodingKeys: String, CodingKey {
+        case id, name, description, images, uri, isPublic, ownerId, ownerName, externalUrl
+        case trackIds, totalDurationMs
+        case _knownTrackCount = "knownTrackCount"
+    }
     let id: String
     var name: String // Mutable - can be edited
     var description: String?
@@ -364,7 +374,7 @@ func totalDuration(of tracks: some Sequence<Track>) -> String {
 // MARK: - Pagination State
 
 /// Tracks pagination state for a collection.
-struct PaginationState: Sendable, Encodable {
+struct PaginationState: Sendable, Codable {
     var isLoaded = false
     var isLoading = false
     var hasMore = true
