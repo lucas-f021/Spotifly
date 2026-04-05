@@ -149,6 +149,40 @@ extension SpotifyAPI {
         }
     }
 
+    // MARK: - Artist Top Tracks
+
+    /// Fetches an artist's top tracks (up to 10)
+    static func fetchArtistTopTracks(accessToken: String, artistId: String) async throws -> [APITrack] {
+        let urlString = "\(baseURL)/artists/\(artistId)/top-tracks"
+
+        debugLog("SpotifyAPI", "[GET] \(urlString)")
+
+        guard let url = URL(string: urlString) else {
+            throw SpotifyAPIError.invalidURI
+        }
+
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+
+        let (data, httpResponse) = try await SpotifyAPI.data(for: request)
+
+        switch httpResponse.statusCode {
+        case 200:
+            do {
+                let decoded = try JSONDecoder().decode(ArtistTopTracksCodable.self, from: data)
+                return decoded.tracks.map { $0.toAPITrack() }
+            } catch {
+                throw SpotifyAPIError.invalidResponse
+            }
+        case 401:
+            throw SpotifyAPIError.unauthorized
+        case 404:
+            throw SpotifyAPIError.notFound
+        default:
+            try throwAPIError(data: data, statusCode: httpResponse.statusCode)
+        }
+    }
+
     // MARK: - User's Top Artists
 
     /// Fetches user's top artists from Spotify Web API
