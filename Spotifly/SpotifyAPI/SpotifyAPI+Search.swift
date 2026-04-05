@@ -29,11 +29,7 @@ extension SpotifyAPI {
         var request = URLRequest(url: url)
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw SpotifyAPIError.invalidResponse
-        }
+        let (data, httpResponse) = try await SpotifyAPI.data(for: request)
 
         switch httpResponse.statusCode {
         case 200:

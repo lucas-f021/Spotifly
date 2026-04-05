@@ -75,6 +75,9 @@ struct AlbumDetailView: View {
         }
         .navigationTitle(album?.name ?? "")
         .task(id: albumId) {
+            // Debounce: if user clicks through albums quickly, cancel before firing requests
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
             // Use initial album if provided, otherwise fetch
             if let initialAlbum {
                 album = initialAlbum
@@ -272,6 +275,7 @@ struct AlbumDetailView: View {
                 albumId: albumId,
                 accessToken: token,
             )
+            StoreCache.save(from: store)
         } catch {
             errorMessage = error.localizedDescription
         }

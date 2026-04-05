@@ -167,6 +167,11 @@ struct LoggedInView: View {
                 SpotifySession.current = session
             #endif
 
+            // Apply cache before any API calls so UI shows instantly on relaunch
+            if let snapshot = StoreCache.load() {
+                store.applyCache(snapshot)
+            }
+
             // Load startup data
             let token = await session.validAccessToken()
 
@@ -202,6 +207,9 @@ struct LoggedInView: View {
             async let recentlyPlayed: () = recentlyPlayedService.loadRecentlyPlayed(accessToken: token)
 
             _ = await (favorites, topArtists, topTracks, recentlyPlayed)
+
+            // Persist to cache so next launch skips these API calls
+            StoreCache.save(from: store)
 
             // Set token provider for automatic reconnection
             playbackViewModel.setTokenProvider { await session.validAccessToken() }

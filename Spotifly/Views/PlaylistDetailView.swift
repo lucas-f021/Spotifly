@@ -90,6 +90,9 @@ struct PlaylistDetailView: View {
         }
         .navigationTitle(playlist?.name ?? "")
         .task(id: playlistId) {
+            // Debounce: if user clicks through playlists quickly, cancel before firing requests
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
             // Use initial playlist if provided, otherwise fetch
             if let initialPlaylist {
                 playlist = initialPlaylist
