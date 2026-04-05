@@ -747,6 +747,10 @@ struct LoggedInView: View {
                             SpeakersView(playbackViewModel: playbackViewModel)
                                 .navigationTitle("nav.speakers")
 
+                        case .equalizer:
+                            EqualizerView()
+                                .navigationTitle("nav.equalizer")
+
                         case .profile:
                             if let profile = store.userProfile {
                                 UserProfileView(userProfile: profile, onLogout: {
