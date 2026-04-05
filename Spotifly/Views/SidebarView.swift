@@ -16,6 +16,7 @@ enum NavigationItem: Hashable, Identifiable {
     case artists
     case queue
     case speakers
+    case equalizer
     case profile
 
     var id: String {
@@ -28,6 +29,7 @@ enum NavigationItem: Hashable, Identifiable {
         case .artists: "artists"
         case .queue: "queue"
         case .speakers: "speakers"
+        case .equalizer: "equalizer"
         case .profile: "profile"
         }
     }
@@ -50,6 +52,8 @@ enum NavigationItem: Hashable, Identifiable {
             String(localized: "nav.queue")
         case .speakers:
             String(localized: "nav.speakers")
+        case .equalizer:
+            String(localized: "nav.equalizer")
         case .profile:
             String(localized: "nav.profile")
         }
@@ -73,6 +77,8 @@ enum NavigationItem: Hashable, Identifiable {
             "list.bullet"
         case .speakers:
             "hifispeaker.2.fill"
+        case .equalizer:
+            "slider.horizontal.3"
         case .profile:
             "person.circle.fill"
         }
@@ -87,7 +93,7 @@ struct SidebarView: View {
 
     /// Navigation items in the main section
     private var mainNavItems: [NavigationItem] {
-        [.startpage, .queue, .speakers]
+        [.startpage, .queue, .speakers, .equalizer]
     }
 
     var body: some View {

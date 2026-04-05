@@ -153,6 +153,9 @@ private nonisolated(unsafe) let sessionClientChangedSubject = PassthroughSubject
 /// Audio renderer for AirPlay-compatible playback via AVSampleBufferAudioRenderer
 private nonisolated let audioRenderer = AudioRenderer()
 
+/// Public access to the equalizer for the EQ UI
+nonisolated let sharedEqualizer: Equalizer = audioRenderer.equalizer
+
 /// Audio control event codes (must match Rust proxy_sink constants)
 private let audioControlStop: UInt8 = 0
 private let audioControlStart: UInt8 = 1

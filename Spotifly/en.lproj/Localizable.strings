@@ -21,6 +21,10 @@
 "nav.artists" = "Artists";
 "nav.queue" = "Queue";
 "nav.speakers" = "Speakers";
+"nav.equalizer" = "Equalizer";
+"eq.title" = "Equalizer";
+"eq.enabled" = "Enabled";
+"eq.reset" = "Reset";
 "nav.library" = "Library";
 "nav.profile" = "Profile";
 "nav.back_to %@" = "Back to %@";

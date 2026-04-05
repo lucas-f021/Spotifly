@@ -44,6 +44,10 @@ final nonisolated class AudioRenderer: @unchecked Sendable {
     private let spaceAvailable = DispatchSemaphore(value: 0)
     private var writerIsWaiting = false
 
+    // MARK: - Equalizer
+
+    let equalizer = Equalizer()
+
     // MARK: - Volume (applied when reading from ring buffer)
 
     /// Current volume scale factor (0.0 – 1.0). Protected by bufferLock.
@@ -260,11 +264,16 @@ final nonisolated class AudioRenderer: @unchecked Sendable {
             }
 
             // Apply volume scaling to this chunk
+            let ptr = chunk.assumingMemoryBound(to: Float.self)
             if vol < 0.9999 {
-                let ptr = chunk.assumingMemoryBound(to: Float.self)
                 for i in 0 ..< toRead {
                     ptr[i] *= vol
                 }
+            }
+
+            // Apply EQ (after volume, before enqueue)
+            if equalizer.isEnabled {
+                equalizer.process(ptr, count: toRead)
             }
 
             // Create CMBlockBuffer from chunk data
