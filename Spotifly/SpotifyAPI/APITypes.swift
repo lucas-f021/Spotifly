@@ -582,9 +582,16 @@ struct UserAlbumsCodable: Decodable {
     }
 }
 
-/// Artist albums
+/// Artist albums (paginated)
 struct ArtistAlbumsCodable: Decodable {
     let items: [AlbumCodable]
+    let total: Int
+    let next: String?
+}
+
+/// Artist top tracks
+struct ArtistTopTracksCodable: Decodable {
+    let tracks: [TrackCodable]
 }
 
 /// New releases

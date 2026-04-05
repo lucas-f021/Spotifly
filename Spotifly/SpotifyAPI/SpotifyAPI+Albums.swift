@@ -85,13 +85,15 @@ extension SpotifyAPI {
 
     // MARK: - Artist Albums
 
-    /// Fetches albums for a specific artist
+    /// Fetches albums for a specific artist (paginated)
     static func fetchArtistAlbums(
         accessToken: String,
         artistId: String,
+        includeGroups: String = "album",
         limit: Int = 10,
-    ) async throws -> [APIAlbum] {
-        let urlString = "\(baseURL)/artists/\(artistId)/albums?include_groups=album%2Csingle&limit=\(limit)"
+        offset: Int = 0,
+    ) async throws -> AlbumsResponse {
+        let urlString = "\(baseURL)/artists/\(artistId)/albums?include_groups=\(includeGroups)&limit=\(limit)&offset=\(offset)"
 
         debugLog("SpotifyAPI", "[GET] \(urlString)")
 
@@ -108,7 +110,14 @@ extension SpotifyAPI {
         case 200:
             do {
                 let decoded = try JSONDecoder().decode(ArtistAlbumsCodable.self, from: data)
-                return decoded.items.map { $0.toAPIAlbum() }
+                let albums = decoded.items.map { $0.toAPIAlbum() }
+                let nextOffset = offset + limit
+                return AlbumsResponse(
+                    albums: albums,
+                    hasMore: decoded.next != nil,
+                    nextOffset: decoded.next != nil ? nextOffset : nil,
+                    total: decoded.total,
+                )
             } catch {
                 throw SpotifyAPIError.invalidResponse
             }

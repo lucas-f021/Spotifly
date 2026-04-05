@@ -22,11 +22,33 @@ struct ArtistDetailView: View {
     @Environment(\.displayScale) private var displayScale
 
     @State private var artist: Artist?
+    @State private var topTracks: [Track] = []
+
+    // Albums section
     @State private var albums: [Album] = []
+    @State private var albumsTotal: Int = 0
+    @State private var albumsOffset: Int = 0
+    @State private var albumsHasMore: Bool = false
+    @State private var isLoadingMoreAlbums: Bool = false
+
+    // Singles & EPs section
+    @State private var singles: [Album] = []
+    @State private var singlesTotal: Int = 0
+    @State private var singlesOffset: Int = 0
+    @State private var singlesHasMore: Bool = false
+    @State private var isLoadingMoreSingles: Bool = false
+
+    // Compilations section
+    @State private var compilations: [Album] = []
+    @State private var compilationsTotal: Int = 0
+    @State private var compilationsOffset: Int = 0
+    @State private var compilationsHasMore: Bool = false
+    @State private var isLoadingMoreCompilations: Bool = false
+
     @State private var isLoadingArtist = false
-    @State private var isLoadingAlbums = false
+    @State private var isLoadingReleases = false
+    @State private var isLoadingTopTracks = false
     @State private var errorMessage: String?
-    @State private var showAllAlbums = false
     @State private var showUnfollowConfirmation = false
 
     /// Whether this artist is in the user's followed artists
@@ -73,13 +95,19 @@ struct ArtistDetailView: View {
             // Debounce: if user clicks through artists quickly, cancel before firing requests
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
+            // Reset state for new artist
+            topTracks = []
+            albums = []; albumsOffset = 0; albumsHasMore = false
+            singles = []; singlesOffset = 0; singlesHasMore = false
+            compilations = []; compilationsOffset = 0; compilationsHasMore = false
             // Use initial artist if provided, otherwise fetch
             if let initialArtist {
                 artist = initialArtist
             } else {
                 await loadArtist()
             }
-            await loadAlbums()
+            await loadTopTracks()
+            await loadReleases()
         }
         .alert("artist.unfollow.title", isPresented: $showUnfollowConfirmation) {
             Button("action.cancel", role: .cancel) {}
@@ -146,53 +174,109 @@ struct ArtistDetailView: View {
                 }
                 .padding(.top, 24)
 
-                // Albums Section
-                if isLoadingAlbums {
+                // Top Tracks Section
+                if isLoadingTopTracks {
+                    ProgressView("loading.top_tracks")
+                        .padding()
+                } else if !topTracks.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("section.top_tracks")
+                            .font(.headline)
+                            .padding(.horizontal)
+
+                        ForEach(Array(topTracks.enumerated()), id: \.element.id) { index, track in
+                            TrackRow(
+                                track: track,
+                                index: index + 1,
+                                currentlyPlayingURI: playbackViewModel.currentTrackUri,
+                                playbackViewModel: playbackViewModel,
+                            )
+                        }
+                    }
+                }
+
+                // Albums / Singles+EPs / Compilations
+                if isLoadingReleases {
                     ProgressView("loading.albums")
                         .padding()
-                } else if !albums.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("section.albums")
-                                .font(.headline)
-
-                            Spacer()
-
-                            if albums.count > 5 {
-                                Button {
-                                    withAnimation {
-                                        showAllAlbums.toggle()
-                                    }
-                                } label: {
-                                    if showAllAlbums {
-                                        Text("artist.show_less")
-                                    } else {
-                                        Text("artist.show_all \(albums.count)")
-                                    }
-                                }
-                                .font(.subheadline)
-                                .foregroundStyle(.green)
-                            }
-                        }
-                        .padding(.horizontal)
-
-                        let displayedAlbums = showAllAlbums ? albums : Array(albums.prefix(5))
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 180), spacing: 16)], spacing: 16) {
-                            ForEach(displayedAlbums) { album in
-                                AlbumCard(album: album) {
-                                    navigationCoordinator.navigateToAlbumSection(
-                                        albumId: album.id,
-                                        from: .artists,
-                                        selectionId: artistId,
-                                    )
-                                }
-                            }
-                        }
-                        .padding(.horizontal)
-                    }
+                } else {
+                    releaseSection(
+                        title: "Albums",
+                        items: albums,
+                        total: albumsTotal,
+                        hasMore: albumsHasMore,
+                        isLoadingMore: isLoadingMoreAlbums,
+                        loadMore: { Task { await loadMoreSection(group: "album") } }
+                    )
+                    releaseSection(
+                        title: "Singles & EPs",
+                        items: singles,
+                        total: singlesTotal,
+                        hasMore: singlesHasMore,
+                        isLoadingMore: isLoadingMoreSingles,
+                        loadMore: { Task { await loadMoreSection(group: "single") } }
+                    )
+                    releaseSection(
+                        title: "Compilations",
+                        items: compilations,
+                        total: compilationsTotal,
+                        hasMore: compilationsHasMore,
+                        isLoadingMore: isLoadingMoreCompilations,
+                        loadMore: { Task { await loadMoreSection(group: "compilation") } }
+                    )
                 }
             }
             .padding(.bottom, 100)
+        }
+    }
+
+    @ViewBuilder
+    private func releaseSection(
+        title: String,
+        items: [Album],
+        total: Int,
+        hasMore: Bool,
+        isLoadingMore: Bool,
+        loadMore: @escaping () -> Void,
+    ) -> some View {
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text(title).font(.headline)
+                    if total > 0 {
+                        Text("(\(total))").font(.headline).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal)
+
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 180), spacing: 16)], spacing: 16) {
+                    ForEach(items) { album in
+                        AlbumCard(album: album) {
+                            navigationCoordinator.navigateToAlbumSection(
+                                albumId: album.id,
+                                from: .artists,
+                                selectionId: artistId,
+                            )
+                        }
+                    }
+                }
+                .padding(.horizontal)
+
+                if hasMore {
+                    HStack {
+                        Spacer()
+                        if isLoadingMore {
+                            ProgressView()
+                        } else {
+                            Button("Show more") { loadMore() }
+                                .foregroundStyle(.green)
+                        }
+                        Spacer()
+                    }
+                    .padding(.vertical, 8)
+                }
+            }
         }
     }
 
@@ -276,22 +360,81 @@ struct ArtistDetailView: View {
         isLoadingArtist = false
     }
 
-    private func loadAlbums() async {
-        albums = []
-        isLoadingAlbums = true
-
+    private func loadTopTracks() async {
+        isLoadingTopTracks = true
         do {
             let token = await session.validAccessToken()
-            // Load via service (stores albums in AppStore)
-            albums = try await artistService.fetchArtistAlbums(
-                artistId: artistId,
-                accessToken: token,
-            )
+            topTracks = try await artistService.fetchArtistTopTracks(artistId: artistId, accessToken: token)
         } catch {
-            // Silently fail for albums - not critical
+            debugLog("ArtistDetailView", "fetchArtistTopTracks failed: \(error)")
         }
+        isLoadingTopTracks = false
+    }
 
-        isLoadingAlbums = false
+    private func loadReleases() async {
+        isLoadingReleases = true
+        let token = await session.validAccessToken()
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await self.fetchSection(group: "album", token: token) }
+            group.addTask { await self.fetchSection(group: "single", token: token) }
+            group.addTask { await self.fetchSection(group: "compilation", token: token) }
+        }
+        isLoadingReleases = false
+    }
+
+    private func fetchSection(group: String, token: String) async {
+        do {
+            let response = try await artistService.fetchArtistAlbums(artistId: artistId, accessToken: token, includeGroups: group, offset: 0)
+            let newAlbums = response.albums.map { Album(from: $0) }
+            switch group {
+            case "album":
+                albums = newAlbums; albumsTotal = response.total
+                albumsOffset = newAlbums.count; albumsHasMore = response.hasMore
+            case "single":
+                singles = newAlbums; singlesTotal = response.total
+                singlesOffset = newAlbums.count; singlesHasMore = response.hasMore
+            case "compilation":
+                compilations = newAlbums; compilationsTotal = response.total
+                compilationsOffset = newAlbums.count; compilationsHasMore = response.hasMore
+            default: break
+            }
+        } catch {
+            debugLog("ArtistDetailView", "fetchSection(\(group)) failed: \(error)")
+        }
+    }
+
+    private func loadMoreSection(group: String) async {
+        let token = await session.validAccessToken()
+        switch group {
+        case "album":
+            guard albumsHasMore, !isLoadingMoreAlbums else { return }
+            isLoadingMoreAlbums = true
+            do {
+                let response = try await artistService.fetchArtistAlbums(artistId: artistId, accessToken: token, includeGroups: group, offset: albumsOffset)
+                albums.append(contentsOf: response.albums.map { Album(from: $0) })
+                albumsOffset += response.albums.count; albumsHasMore = response.hasMore
+            } catch { debugLog("ArtistDetailView", "loadMore(album) failed: \(error)") }
+            isLoadingMoreAlbums = false
+        case "single":
+            guard singlesHasMore, !isLoadingMoreSingles else { return }
+            isLoadingMoreSingles = true
+            do {
+                let response = try await artistService.fetchArtistAlbums(artistId: artistId, accessToken: token, includeGroups: group, offset: singlesOffset)
+                singles.append(contentsOf: response.albums.map { Album(from: $0) })
+                singlesOffset += response.albums.count; singlesHasMore = response.hasMore
+            } catch { debugLog("ArtistDetailView", "loadMore(single) failed: \(error)") }
+            isLoadingMoreSingles = false
+        case "compilation":
+            guard compilationsHasMore, !isLoadingMoreCompilations else { return }
+            isLoadingMoreCompilations = true
+            do {
+                let response = try await artistService.fetchArtistAlbums(artistId: artistId, accessToken: token, includeGroups: group, offset: compilationsOffset)
+                compilations.append(contentsOf: response.albums.map { Album(from: $0) })
+                compilationsOffset += response.albums.count; compilationsHasMore = response.hasMore
+            } catch { debugLog("ArtistDetailView", "loadMore(compilation) failed: \(error)") }
+            isLoadingMoreCompilations = false
+        default: break
+        }
     }
 
     private func unfollowArtist() {

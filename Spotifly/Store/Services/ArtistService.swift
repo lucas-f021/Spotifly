@@ -112,23 +112,33 @@ final class ArtistService {
 
     // MARK: - Artist Content
 
-    /// Fetch artist's albums
+    /// Fetch a page of artist's releases for a specific group type
     func fetchArtistAlbums(
         artistId: String,
         accessToken: String,
-        limit: Int = 50,
-    ) async throws -> [Album] {
-        let searchAlbums = try await SpotifyAPI.fetchArtistAlbums(
+        includeGroups: String = "album",
+        offset: Int = 0,
+    ) async throws -> AlbumsResponse {
+        let response = try await SpotifyAPI.fetchArtistAlbums(
             accessToken: accessToken,
             artistId: artistId,
-            limit: limit,
+            includeGroups: includeGroups,
+            limit: 10,
+            offset: offset,
         )
+        store.upsertAlbums(response.albums.map { Album(from: $0) })
+        return response
+    }
 
-        // Convert to unified Album entities
-        let albums = searchAlbums.map { Album(from: $0) }
-        store.upsertAlbums(albums)
-
-        return albums
+    /// Fetch artist's top tracks (up to 10)
+    func fetchArtistTopTracks(artistId: String, accessToken: String) async throws -> [Track] {
+        let apiTracks = try await SpotifyAPI.fetchArtistTopTracks(
+            accessToken: accessToken,
+            artistId: artistId,
+        )
+        let tracks = apiTracks.map { Track(from: $0) }
+        store.upsertTracks(tracks)
+        return tracks
     }
 
     // MARK: - Follow/Unfollow Artist
