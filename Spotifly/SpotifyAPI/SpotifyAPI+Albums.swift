@@ -97,9 +97,9 @@ extension SpotifyAPI {
     static func fetchArtistAlbums(
         accessToken: String,
         artistId: String,
-        limit: Int = 50,
+        limit: Int = 10,
     ) async throws -> [APIAlbum] {
-        let urlString = "\(baseURL)/artists/\(artistId)/albums?include_groups=album,single&limit=\(limit)"
+        let urlString = "\(baseURL)/artists/\(artistId)/albums?include_groups=album%2Csingle&limit=\(limit)"
 
         debugLog("SpotifyAPI", "[GET] \(urlString)")
 

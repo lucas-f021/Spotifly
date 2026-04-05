@@ -35,7 +35,7 @@ final class SearchService {
                 accessToken: accessToken,
                 query: query,
                 types: [.track, .album, .artist, .playlist],
-                limit: 20,
+                limit: 10,
             )
 
             store.setSearchResults(results)

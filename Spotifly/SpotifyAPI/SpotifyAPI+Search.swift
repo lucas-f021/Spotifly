@@ -15,9 +15,9 @@ extension SpotifyAPI {
         accessToken: String,
         query: String,
         types: [SearchType] = [.track, .album, .artist, .playlist],
-        limit: Int = 20,
+        limit: Int = 10,
     ) async throws -> SearchResults {
-        let typesString = types.map(\.rawValue).joined(separator: ",")
+        let typesString = types.map(\.rawValue).joined(separator: "%2C")
         let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
         let urlString = "\(baseURL)/search?q=\(encodedQuery)&type=\(typesString)&limit=\(limit)"
         debugLog("SpotifyAPI", "[GET] \(urlString)")
