@@ -9,6 +9,10 @@
 
 import Foundation
 
+// MARK: - Cache Limits
+
+private let maxCacheBytes = 4 * 1024 * 1024 // 4MB
+
 // MARK: - Cache File Location
 
 private let cacheFileName = "spotifly_store_cache.json"
@@ -57,6 +61,54 @@ struct CacheSnapshot: Codable {
     var favoritesPagination: CacheSection<PaginationState>?
 }
 
+// MARK: - CacheSnapshot Eviction
+
+private extension CacheSnapshot {
+    /// Returns a trimmed snapshot by evicting browse-only data (non-library albums/artists/orphaned tracks).
+    /// Eviction priority:
+    ///   1. Albums not in userAlbumIds (browsed but not owned)
+    ///   2. Artists not in userArtistIds (browsed but not followed)
+    ///   3. Tracks not referenced by any remaining album/playlist, savedTrackIds, or favoriteTrackIds
+    func evictBrowseCache() -> CacheSnapshot {
+        var result = self
+
+        // 1. Drop non-library albums
+        let libraryAlbumIds = Set(userAlbumIds?.data ?? [])
+        if let section = result.albums {
+            result.albums = CacheSection(
+                data: section.data.filter { libraryAlbumIds.contains($0.key) },
+                savedAt: section.savedAt
+            )
+        }
+
+        // 2. Drop non-library artists
+        let libraryArtistIds = Set(userArtistIds?.data ?? [])
+        if let section = result.artists {
+            result.artists = CacheSection(
+                data: section.data.filter { libraryArtistIds.contains($0.key) },
+                savedAt: section.savedAt
+            )
+        }
+
+        // 3. Drop orphaned tracks: keep only those referenced by remaining albums/playlists,
+        //    saved track IDs, or favorite track IDs
+        let savedIds = Set(result.savedTrackIds?.data ?? [])
+        let favoriteIds = Set(result.favoriteTrackIds?.data ?? [])
+        let albumTrackIds = Set(result.albums?.data.values.flatMap { $0.trackIds } ?? [])
+        let playlistTrackIds = Set(result.playlists?.data.values.flatMap { $0.trackIds } ?? [])
+        let keepTrackIds = savedIds.union(favoriteIds).union(albumTrackIds).union(playlistTrackIds)
+
+        if let section = result.tracks {
+            result.tracks = CacheSection(
+                data: section.data.filter { keepTrackIds.contains($0.key) },
+                savedAt: section.savedAt
+            )
+        }
+
+        return result
+    }
+}
+
 // MARK: - StoreCache
 
 enum StoreCache {
@@ -91,9 +143,18 @@ enum StoreCache {
                 at: url.deletingLastPathComponent(),
                 withIntermediateDirectories: true,
             )
-            let data = try JSONEncoder().encode(snapshot)
-            try data.write(to: url, options: .atomic)
-            debugLog("StoreCache", "Saved cache (\(data.count / 1024)KB) to \(url.lastPathComponent)")
+            var encoded = try JSONEncoder().encode(snapshot)
+
+            // If over 4MB, evict browse-only data and re-encode
+            if encoded.count > maxCacheBytes {
+                let beforeKB = encoded.count / 1024
+                let trimmed = snapshot.evictBrowseCache()
+                encoded = try JSONEncoder().encode(trimmed)
+                debugLog("StoreCache", "Cache trimmed: \(beforeKB)KB → \(encoded.count / 1024)KB (evicted non-library browse data)")
+            }
+
+            try encoded.write(to: url, options: .atomic)
+            debugLog("StoreCache", "Saved cache (\(encoded.count / 1024)KB) to \(url.lastPathComponent)")
         } catch {
             debugLog("StoreCache", "Save failed: \(error)")
         }
