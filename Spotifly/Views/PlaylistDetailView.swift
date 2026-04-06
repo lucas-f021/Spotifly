@@ -279,7 +279,7 @@ struct PlaylistDetailView: View {
     }
 
     private var normalTrackList: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        LazyVStack(alignment: .leading, spacing: 0) {
             ForEach(Array(tracks.enumerated()), id: \.offset) { index, track in
                 trackRowView(track: track, index: index)
 
